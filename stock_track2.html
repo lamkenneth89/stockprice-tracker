@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>強勢股捕捉器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Navbar -->
+    <nav class="bg-blue-600 text-white p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="text-2xl font-bold">Logo</div>
+            <ul class="flex space-x-4">
+                <li><a href="#home" class="hover:text-gray-300">首頁</a></li>
+                <li><a href="#features" class="hover:text-gray-300">功能</a></li>
+                <li><a href="#contact" class="hover:text-gray-300">聯絡我們</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Title Section -->
+    <header class="bg-blue-600 text-white text-center py-6">
+        <h1 class="text-3xl font-bold">強勢股捕捉器</h1>
+        <p class="mt-2 text-lg">這個應用程式幫助您在您監控的股票中找出增長最快的股票，讓您更容易識別市場中的強勢股。</p>
+    </header>
+
+    <div id="app">
+        <!-- Add Stock Section -->
+        <section class="max-w-2xl mx-auto mt-8 p-6 bg-white shadow-md rounded-md">
+            <h2 class="text-xl font-semibold mb-4">添加監控股票</h2>
+            <div class="flex space-x-4 mb-4">
+                <input type="text" v-model="newStock" placeholder="股票代碼" class="flex-grow p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50">
+                <button @click="addStock" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">添加</button>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <span v-for="stock in stocks" :key="stock" class="bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-sm">
+                    {{ stock }}
+                    <button @click="removeStock(stock)" class="ml-1 text-blue-600 hover:text-blue-800">&times;</button>
+                </span>
+            </div>
+        </section>
+
+        <!-- Define Model Section -->
+        <section class="max-w-2xl mx-auto mt-8 p-6 bg-white shadow-md rounded-md">
+            <h2 class="text-xl font-semibold mb-4">定義模型</h2>
+            <div class="flex space-x-4">
+                <select v-model="modelPeriod" class="flex-grow p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50">
+                    <option value="10days">10天</option>
+                    <option value="5days">5天</option>
+                    <option value="1month">1個月</option>
+                    <option value="3months">3個月</option>
+                    <option value="6months">6個月</option>
+                </select>
+                <button @click="runModel" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">運行模型</button>
+            </div>
+        </section>
+
+        <!-- Results Table Section -->
+        <section class="max-w-4xl mx-auto mt-8 p-6 bg-white shadow-md rounded-md">
+            <h2 class="text-xl font-semibold mb-4">結果</h2>
+            <div v-if="loading">Loading...</div>
+            <div v-else>
+                <table class="min-w-full bg-white">
+                    <thead>
+                        <tr class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
+                            <th class="py-3 px-6 text-left">股票</th>
+                            <th class="py-3 px-6 text-left">回報率</th>
+                            <th class="py-3 px-6 text-left">排名</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-600 text-sm font-light">
+                        <tr v-for="(stock, index) in sortedStocks" :key="stock.name" class="border-b border-gray-200 hover:bg-gray-100">
+                            <td class="py-3 px-6 text-left">{{ stock.name }}</td>
+                            <td class="py-3 px-6 text-left">{{ stock.growthRate }}%</td>
+                            <td class="py-3 px-6 text-left">{{ index + 1 }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-6 mt-8">
+        <!-- Footer content (unchanged) -->
+    </footer>
+
+    <script>
+        const { createApp, ref, onMounted } = Vue
+
+        createApp({
+            data() {
+                return {
+                    newStock: '',
+                    stocks: [],
+                    modelPeriod: '3months',
+                    stockData: [],
+                    loading: false
+                };
+            },
+            computed: {
+                sortedStocks() {
+                    return this.stockData.sort((a, b) => b.growthRate - a.growthRate);
+                }
+            },
+            methods: {
+                addStock() {
+                    if (this.newStock.trim() !== '' && !this.stocks.includes(this.newStock.trim())) {
+                        this.stocks.push(this.newStock.trim());
+                        this.newStock = '';
+                    }
+                },
+                removeStock(stock) {
+                    this.stocks = this.stocks.filter(s => s !== stock);
+                },
+                async runModel() {
+                    this.loading = true;
+                    this.stockData = [];
+                    for (let stock of this.stocks) {
+                        const growthRate = await this.fetchStockGrowthRate(stock);
+                        if (growthRate !== null) {
+                            this.stockData.push({ name: stock, growthRate });
+                        }
+                    }
+                    this.loading = false;
+                },
+                async fetchStockGrowthRate(stock) {
+                    try {
+                        const response = await fetch(`https://financialmodelingprep.com/api/v3/historical-price-full/${stock}?apikey=mm47OmZP1D3MHK1fXulx8kOoNYbDdt0h`)
+                        const data = await response.json();
+                        const historicalData = data.historical;
+
+                        const getPriceOnOrBeforeDate = (targetDate) => {
+                            for (let i = 0; i < historicalData.length; i++) {
+                                const dataDate = new Date(historicalData[i].date);
+                                if (dataDate <= targetDate && historicalData[i].close) {
+                                    return historicalData[i].close.toFixed(2);
+                                }
+                            }
+                            return null;
+                        }
+
+                        const todayPrice = getPriceOnOrBeforeDate(new Date());
+                        if (!todayPrice) return null;
+
+                        let pastDate = new Date();
+                        switch (this.modelPeriod) {
+                            case '10days':
+                                pastDate.setDate(pastDate.getDate() - 10);
+                                break;
+                            case '5days':
+                                pastDate.setDate(pastDate.getDate() - 5);
+                                break;
+                            case '1month':
+                                pastDate.setMonth(pastDate.getMonth() - 1);
+                                break;
+                            case '3months':
+                                pastDate.setMonth(pastDate.getMonth() - 3);
+                                break;
+                            case '6months':
+                                pastDate.setMonth(pastDate.getMonth() - 6);
+                                break;
+                        }
+
+                        const pastPrice = getPriceOnOrBeforeDate(pastDate);
+                        if (!pastPrice) return null;
+
+                        const growthRate = ((todayPrice - pastPrice) / pastPrice * 100).toFixed(2);
+                        return growthRate;
+                    } catch (error) {
+                        console.error('Error fetching stock data:', error);
+                        return null;
+                    }
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
